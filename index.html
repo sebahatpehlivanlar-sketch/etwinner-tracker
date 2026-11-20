@@ -13,14 +13,14 @@
 <div class="panel"><h2>Record a helpful reply</h2><form id="form"><label>School<select id="school" required></select></label><label>Group code<select id="group" required></select></label><label>Link to the forum reply<input id="link" type="url" required placeholder="https://…"></label><button type="submit">Add one apple</button></form><p id="status" role="status"></p><h2>Reply log</h2><ol id="log"></ol><div class="tools"><button id="export">Export records</button><button id="import">Import records</button><input id="file" type="file" accept=".json,application/json" hidden></div><small>Records are saved in this browser.</small></div></section></main>
 <script>
 'use strict';
-const months=['November','December','January','February','March','April','May'];
+const months=['December','January','February','March','April','May'];
 const countryNames={GR:'Greece',HU:'Hungary',LT:'Lithuania',RO:'Romania',ES:'Spain',TR:'Türkiye'};
-const codes=Object.keys(countryNames);
+const codes=Object.keys(countryNames).filter(country=>country!=='LT');
 const rize={id:'school-6',country:'TR',name:'Türkiye 1 – Rize'};
 const eskisehir={id:'school-7',country:'TR',name:'Türkiye 2 – Eskişehir'};
 const formerRizeName='Çayeli Merkez Atatürk Secondary School';
 const defaults=[
- ...codes.filter(country=>country!=='TR').map((country,i)=>({id:'school-'+(i+1),country,name:countryNames[country]+' school'})),
+ ...Object.entries({GR:1,HU:2,RO:4,ES:5}).map(([country,id])=>({id:'school-'+id,country,name:countryNames[country]+' school'})),
  rize,eskisehir
 ];
 const key='obmr-tree-tracker-v1';
@@ -28,14 +28,11 @@ const schoolKey='obmr-tree-schools-v1';
 const el=id=>document.getElementById(id);
 const read=(k,fallback)=>{try{return JSON.parse(localStorage.getItem(k))??fallback}catch{return fallback}};
 let month='December';
-let schools=read(schoolKey,defaults).map(s=>
+let schools=read(schoolKey,defaults).filter(s=>s.country!=='LT').map(s=>
  s.id===rize.id&&s.country==='TR'&&s.name===formerRizeName?rize:s
 );
 if(!schools.some(s=>s.id===eskisehir.id))schools.push(eskisehir);
-if(!schools.some(s=>s.country==='LT')){
- const lithuania=defaults.find(s=>s.country==='LT');
- schools.push(schools.some(s=>s.id===lithuania.id)?{...lithuania,id:'school-lt'}:lithuania);
-}
+const isArchived=r=>r.month==='November'||r.country==='LT';
 let records=read(key,[]).map(r=>({...r,school:r.school??defaults.find(s=>s.country===r.group.slice(0,2))?.id,country:r.country??r.group.slice(0,2)}));
 const points=[[25,32],[34,22],[43,29],[52,18],[62,26],[72,34],[31,40],[40,42],[51,37],[59,43],[68,45],[24,46],[35,50],[45,50],[54,49],[64,53],[74,49],[29,56],[39,58],[49,57],[58,59],[68,59],[47,21],[59,33]];
 function save(next,message){
@@ -53,8 +50,8 @@ function resultList(target,rows){
  target.replaceChildren(...rows.map(([name,total])=>{const li=document.createElement('li');li.textContent=name+' — '+total+' 🍎';return li}));
 }
 function render(){
- const entries=records.filter(r=>r.month===month);
- el('monthTitle').textContent=month+(month==='November'?' · Setup':'');
+ const entries=records.filter(r=>r.month===month&&!isArchived(r));
+ el('monthTitle').textContent=month;
  for(const button of el('months').children)button.setAttribute('aria-pressed',button.textContent===month);
  const totals=schools.map(s=>entries.filter(r=>r.school===s.id).length);
  const max=Math.max(...totals);
@@ -134,12 +131,13 @@ el('file').onchange=async e=>{
   const next=[...records];
   for(const r of incoming){
    const country=r.country??r.group.slice(0,2);
-   const schoolId=r.school??defaults.find(s=>s.country===country)?.id;
+   const schoolId=r.school??(country==='LT'?'school-3':defaults.find(s=>s.country===country)?.id);
    const school=schools.find(s=>s.id===schoolId);
    const source=Array.isArray(data)?null:data.schools?.find(s=>s.id===schoolId);
-   if(!months.includes(r.month)||school?.country!==country||!new RegExp('^'+country+'-0[1-5]$').test(r.group))throw Error();
+   const archived=isArchived({...r,country});
+   if((!months.includes(r.month)&&r.month!=='November')||!Object.hasOwn(countryNames,country)||(!archived&&school?.country!==country)||!new RegExp('^'+country+'-0[1-5]$').test(r.group))throw Error();
    const sourceName=schoolId===rize.id&&source?.name===formerRizeName?rize.name:source?.name;
-   if(source&&sourceName!==school.name){el('status').textContent='Match the school names and countries under School settings before importing.';return}
+   if(!archived&&source&&sourceName!==school.name){el('status').textContent='Match the school names and countries under School settings before importing.';return}
    const link=cleanLink(r.link);
    if(!next.some(x=>x.link===link))next.push({month:r.month,school:schoolId,country,group:r.group,link});
   }
