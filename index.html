@@ -5,7 +5,7 @@
 <details class="rules"><summary>How it works</summary><ol>
 <li>In the monthly TwinSpace forum, answer a partner group’s question or suggest one clear improvement. Start with a group from another country that’s waiting for feedback.</li>
 <li>Each helpful reply earns one apple for the school that wrote it. The pupil editor selects their school and group, then adds the reply link. Each link counts once.</li>
-<li>Each tree holds 24 apples. Open a school’s extra trees to see apples earned after 24. Country totals add up the apples from all schools in that country. Ties are shown.</li>
+<li>Each tree holds 24 apples. Open a school’s extra trees to see apples earned after 24. The Country totals list shows Rize and Eskişehir separately and combines schools from each other country. Ties are shown.</li>
 <li>Records and school settings are saved in this browser. Export a copy and import it into the browser your team uses to merge records. The tracker does not sync automatically.</li>
 </ol></details>
 <h2 id="monthTitle"></h2><p id="leaders" class="winner"></p><div id="orchard" class="orchard"></div>
@@ -69,10 +69,16 @@ function render(){
   }
   return card;
  }));
- const countries=new Map(schools.map(s=>[s.country,0]));
- for(const r of entries)countries.set(r.country,(countries.get(r.country)??0)+1);
- const ranking=[...countries].sort((a,b)=>b[1]-a[1]);
- resultList(el('countries'),ranking.map(([c,n])=>[countryNames[c]+(n>0&&n===ranking[0][1]?' · Monthly leader':''),n]));
+ const countryTotals=new Map();
+ schools.forEach((school,i)=>{
+  const key=school.country==='TR'?school.id:school.country;
+  const name=school.country==='TR'?school.name:countryNames[school.country];
+  countryTotals.set(key,{name,total:(countryTotals.get(key)?.total??0)+totals[i]});
+ });
+ const ranking=[...countryTotals.values()].sort((a,b)=>b.total-a.total);
+ resultList(el('countries'),ranking.map(({name,total})=>[
+  name+(total>0&&total===ranking[0].total?' · Monthly leader':''),total
+ ]));
  el('log').replaceChildren(...entries.map(r=>{
   const li=document.createElement('li'),a=document.createElement('a');
   a.textContent=(schools.find(s=>s.id===r.school)?.name??countryNames[r.country])+' · '+r.group+' · View reply';
