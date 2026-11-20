@@ -16,13 +16,26 @@
 const months=['November','December','January','February','March','April','May'];
 const countryNames={GR:'Greece',HU:'Hungary',LT:'Lithuania',RO:'Romania',ES:'Spain',TR:'Türkiye'};
 const codes=Object.keys(countryNames);
-const defaults=codes.map((country,i)=>({id:'school-'+(i+1),country,name:country==='TR'?'Çayeli Merkez Atatürk Secondary School':countryNames[country]+' school'}));
+const rize={id:'school-6',country:'TR',name:'Türkiye 1 – Rize'};
+const eskisehir={id:'school-7',country:'TR',name:'Türkiye 2 – Eskişehir'};
+const formerRizeName='Çayeli Merkez Atatürk Secondary School';
+const defaults=[
+ ...codes.filter(country=>country!=='TR').map((country,i)=>({id:'school-'+(i+1),country,name:countryNames[country]+' school'})),
+ rize,eskisehir
+];
 const key='obmr-tree-tracker-v1';
 const schoolKey='obmr-tree-schools-v1';
 const el=id=>document.getElementById(id);
 const read=(k,fallback)=>{try{return JSON.parse(localStorage.getItem(k))??fallback}catch{return fallback}};
 let month='December';
-let schools=read(schoolKey,defaults);
+let schools=read(schoolKey,defaults).map(s=>
+ s.id===rize.id&&s.country==='TR'&&s.name===formerRizeName?rize:s
+);
+if(!schools.some(s=>s.id===eskisehir.id))schools.push(eskisehir);
+if(!schools.some(s=>s.country==='LT')){
+ const lithuania=defaults.find(s=>s.country==='LT');
+ schools.push(schools.some(s=>s.id===lithuania.id)?{...lithuania,id:'school-lt'}:lithuania);
+}
 let records=read(key,[]).map(r=>({...r,school:r.school??defaults.find(s=>s.country===r.group.slice(0,2))?.id,country:r.country??r.group.slice(0,2)}));
 const points=[[25,32],[34,22],[43,29],[52,18],[62,26],[72,34],[31,40],[40,42],[51,37],[59,43],[68,45],[24,46],[35,50],[45,50],[54,49],[64,53],[74,49],[29,56],[39,58],[49,57],[58,59],[68,59],[47,21],[59,33]];
 function save(next,message){
@@ -95,7 +108,7 @@ function settings(){
 el('settings').onsubmit=e=>{
  e.preventDefault();const data=new FormData(e.target);
  const next=schools.map(s=>({...s,name:data.get(s.id+'-name').trim(),country:data.get(s.id+'-country')??s.country}));
- if(next.some(s=>!s.name)||new Set(next.map(s=>s.name.toLowerCase())).size!==6){el('status').textContent='Enter six different school names.';return}
+ if(next.some(s=>!s.name)||new Set(next.map(s=>s.name.toLowerCase())).size!==next.length){el('status').textContent='Enter a different name for each school.';return}
  try{localStorage.setItem(schoolKey,JSON.stringify(next));schools=next;schoolMenu();render();el('status').textContent='Schools saved.'}catch{el('status').textContent='This browser could not save school settings.'}
 };
 function cleanLink(value){const url=new URL(value);if(!['http:','https:'].includes(url.protocol))throw Error('Invalid link');return url.href}
@@ -125,7 +138,8 @@ el('file').onchange=async e=>{
    const school=schools.find(s=>s.id===schoolId);
    const source=Array.isArray(data)?null:data.schools?.find(s=>s.id===schoolId);
    if(!months.includes(r.month)||school?.country!==country||!new RegExp('^'+country+'-0[1-5]$').test(r.group))throw Error();
-   if(source&&source.name!==school.name){el('status').textContent='Match the school names and countries under School settings before importing.';return}
+   const sourceName=schoolId===rize.id&&source?.name===formerRizeName?rize.name:source?.name;
+   if(source&&sourceName!==school.name){el('status').textContent='Match the school names and countries under School settings before importing.';return}
    const link=cleanLink(r.link);
    if(!next.some(x=>x.link===link))next.push({month:r.month,school:schoolId,country,group:r.group,link});
   }
